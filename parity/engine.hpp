@@ -2,7 +2,6 @@
  * بسم الله الرحمن الرحيم
  */
 
-
 #pragma once
 
 #include <string>
@@ -40,7 +39,7 @@ inline Direction parseDirection(int value) {
     throw std::invalid_argument("Direction must be 1 (fiat->coin) or 2 (coin->fiat)");
 }
 
-// ================= MATH =================
+// ================= PURE MATH =================
 
 struct ConversionResult {
     double coinPriceInFiat;
@@ -88,7 +87,7 @@ inline bool isFresh(const std::chrono::steady_clock::time_point& fetchedAt) {
     return (std::chrono::steady_clock::now() - fetchedAt) < CACHE_DURATION;
 }
 
-// ================= NETWORK FETCHING  =================
+// ================= NETWORK FETCHING =================
 
 inline double fetchUsdToFiatRate(const std::string& fiatCode) {
     if (fiatCode == "USD") return 1.0;
@@ -107,27 +106,50 @@ inline double fetchUsdToFiatRate(const std::string& fiatCode) {
     return data["rates"][fiatCode];
 }
 
+// Maps ticker symbols to CoinGecko's ID format
+// CoinGecko uses full names (e.g. "bitcoin") 
+inline std::string coinGeckoId(const std::string& coin) {
+    static const std::map<std::string, std::string> ids = {
+        {"BTC",  "bitcoin"},
+        {"ETH",  "ethereum"},
+        {"BNB",  "binancecoin"},
+        {"LTC",  "litecoin"},
+        {"USDT", "tether"},
+        {"SOL",  "solana"},
+        {"XRP",  "ripple"}
+    };
+    auto it = ids.find(coin);
+    if (it == ids.end()) {
+        throw std::invalid_argument("No CoinGecko ID mapping for coin: " + coin);
+    }
+    return it->second;
+}
+
 inline double fetchCoinPriceUsdt(const std::string& coin) {
     if (coin == "USDT") return 1.0;
 
-    std::string symbol = coin + "USDT";
+    std::string geckoId = coinGeckoId(coin);
+
     cpr::Response r = cpr::Get(
-        cpr::Url{"https://api.binance.com/api/v3/ticker/price"},
-        cpr::Parameters{{"symbol", symbol}},
+        cpr::Url{"https://api.coingecko.com/api/v3/simple/price"},
+        cpr::Parameters{
+            {"ids", geckoId},
+            {"vs_currencies", "usd"}
+        },
         cpr::Timeout{5000}
     );
 
     if (r.status_code != 200) {
-        throw std::runtime_error("Binance price API returned status " + std::to_string(r.status_code));
+        throw std::runtime_error("CoinGecko API returned status " + std::to_string(r.status_code));
     }
 
     nlohmann::json data = nlohmann::json::parse(r.text);
 
-    if (data.contains("code")) {
-        throw std::runtime_error("Binance error for " + coin + ": " + data.value("msg", "unknown error"));
+    if (!data.contains(geckoId) || !data[geckoId].contains("usd")) {
+        throw std::runtime_error("CoinGecko response missing price for: " + coin);
     }
 
-    return std::stod(data["price"].get<std::string>());
+    return data[geckoId]["usd"].get<double>();
 }
 
 inline double getUsdToFiatRateCached(const std::string& fiatCode) {
@@ -156,7 +178,7 @@ inline double getCoinPriceCached(const std::string& coin) {
     return price;
 }
 
-// ================= CONVERT (validation + network + math) =================
+// ================= validation + network + math =================
 
 inline ConversionResult convert(const std::string& coin, const std::string& currency, double amount, int directionValue) {
     if (!isValidCoin(coin)) {
