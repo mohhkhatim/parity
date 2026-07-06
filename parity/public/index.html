@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Convert between crypto and African currencies (GHS, NGN, KES) using live exchange rates.">
+<title>Parity</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap');
+
+  :root {
+    --bg: #0B0E11;
+    --card: #14181C;
+    --card-raised: #1C2126;
+    --border: #262B31;
+    --ink: #EAECEF;
+    --muted: #848E9C;
+    --yellow: #F0B90B;
+    --green: #0ECB81;
+    --red: #F6465D;
+  }
+
+  * { box-sizing: border-box; }
+
+  button {
+    font-family: inherit;
+    border: none;
+    background: none;
+    margin: 0;
+  }
+
+  body {
+    margin: 0;
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    display: flex;
+    justify-content: center;
+    padding: 48px 20px;
+    min-height: 100vh;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: 16px;
+    max-width: 420px;
+    width: 100%;
+    border: 1px solid var(--border);
+    padding: 28px;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+
+  .logo {
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .logo span { color: var(--yellow); }
+
+  .live-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 3px rgba(14, 203, 129, 0.15);
+  }
+
+  .field-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 22px;
+  }
+
+  .pill {
+    padding: 9px 15px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card-raised);
+    color: var(--ink);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.12s ease;
+  }
+
+  .pill:hover {
+    border-color: var(--muted);
+  }
+
+  .pill.active {
+    background: var(--yellow);
+    color: var(--bg);
+    border-color: var(--yellow);
+  }
+
+  .direction-toggle {
+    display: flex;
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border);
+  }
+
+  .direction-btn {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--muted);
+  }
+
+  .direction-btn.active {
+    background: var(--card-raised);
+    color: var(--ink);
+  }
+
+  input[type="number"] {
+    width: 100%;
+    padding: 15px 16px;
+    font-size: 20px;
+    font-weight: 700;
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--ink);
+    margin-bottom: 20px;
+  }
+
+  input[type="number"]::placeholder {
+    color: var(--muted);
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 15px;
+  }
+
+  input[type="number"]:focus {
+    outline: none;
+    border-color: var(--yellow);
+  }
+
+  .convert-btn {
+    width: 100%;
+    padding: 15px;
+    background: var(--yellow);
+    color: var(--bg);
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+
+  .convert-btn:hover { background: #FFCA28; }
+
+  .convert-btn:disabled {
+    background: var(--border);
+    color: var(--muted);
+    cursor: not-allowed;
+  }
+
+  .result {
+    margin-top: 22px;
+    background: var(--card-raised);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    display: none;
+  }
+
+  .result.visible { display: block; }
+
+  .result-rate {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .result-main {
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 21px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 6px;
+    line-height: 1.35;
+  }
+
+  .result-usd {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .error {
+    margin-top: 16px;
+    padding: 14px;
+    background: rgba(246, 70, 93, 0.1);
+    border: 1px solid rgba(246, 70, 93, 0.25);
+    color: var(--red);
+    border-radius: 10px;
+    font-size: 13px;
+    display: none;
+  }
+
+  .error.visible { display: block; }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .action-btn {
+    flex: 1;
+    padding: 13px;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .buy-btn { background: var(--green); color: var(--bg); }
+  .sell-btn { background: var(--red); color: var(--bg); }
+
+  .loading {
+    text-align: center;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    margin-top: 16px;
+    display: none;
+  }
+
+  .loading.visible { display: block; }
+
+  .disclaimer {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+
+  @media (max-width: 480px) {
+    body { padding: 24px 12px; }
+    .card { padding: 20px; border-radius: 12px; }
+    .logo { font-size: 17px; }
+    .pill { padding: 8px 12px; font-size: 12px; }
+    input[type="number"] { font-size: 18px; padding: 13px 14px; }
+    .result-main { font-size: 18px; }
+    .actions { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <div class="logo">Pari<span>ty</span></div>
+    <div class="live-badge"><div class="live-dot"></div>Live</div>
+  </div>
+
+  <div class="field-label">Coin</div>
+  <div class="pills" id="coinPills"></div>
+
+  <div class="field-label">Currency</div>
+  <div class="pills" id="currencyPills"></div>
+
+  <div class="direction-toggle">
+    <button type="button" class="direction-btn active" id="dir1" onclick="setDirection(1)">Currency → Coin</button>
+    <button type="button" class="direction-btn" id="dir2" onclick="setDirection(2)">Coin → Currency</button>
+  </div>
+
+  <input type="number" id="amountInput" placeholder="Enter amount" min="0" onkeydown="if(event.key==='Enter') doConvert()">
+
+  <button class="convert-btn" id="convertBtn" onclick="doConvert()">Convert</button>
+
+  <div class="loading" id="loading">Fetching live rates…</div>
+  <div class="error" id="error"></div>
+
+  <div class="result" id="result">
+    <div class="result-rate" id="resultRate"></div>
+    <div class="result-main" id="resultMain"></div>
+    <div class="result-usd" id="resultUsd"></div>
+
+    <div class="actions">
+      <a class="action-btn buy-btn" id="buyBtn" target="_blank">Buy</a>
+      <a class="action-btn sell-btn" id="sellBtn" target="_blank">Sell</a>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    Rates shown are indicative, derived from Binance spot pricing and prevailing foreign exchange rates. They do not represent a live peer-to-peer quote and may differ from rates offered by individual sellers. This tool is provided for informational purposes only and does not constitute financial advice.
+  </div>
+</div>
+
+<script>
+  const COINS = ["BTC", "ETH", "BNB", "LTC", "USDT", "SOL", "XRP"];
+  const CURRENCIES = ["GHS", "NGN", "KES", "USD"];
+  const SERVER_URL = "http://localhost:8080";
+
+  let selectedCoin = "BTC";
+  let selectedCurrency = "GHS";
+  let direction = 1;
+  let requestCounter = 0;
+
+  function renderPills() {
+    const coinContainer = document.getElementById("coinPills");
+    coinContainer.innerHTML = "";
+    COINS.forEach(coin => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "pill" + (coin === selectedCoin ? " active" : "");
+      btn.setAttribute("aria-pressed", coin === selectedCoin ? "true" : "false");
+      btn.textContent = coin;
+      btn.onclick = () => { selectedCoin = coin; renderPills(); };
+      coinContainer.appendChild(btn);
+    });
+
+    const currencyContainer = document.getElementById("currencyPills");
+    currencyContainer.innerHTML = "";
+    CURRENCIES.forEach(currency => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "pill" + (currency === selectedCurrency ? " active" : "");
+      btn.setAttribute("aria-pressed", currency === selectedCurrency ? "true" : "false");
+      btn.textContent = currency;
+      btn.onclick = () => { selectedCurrency = currency; renderPills(); };
+      currencyContainer.appendChild(btn);
+    });
+  }
+
+  function setDirection(dir) {
+    direction = dir;
+    document.getElementById("dir1").classList.toggle("active", dir === 1);
+    document.getElementById("dir2").classList.toggle("active", dir === 2);
+    const input = document.getElementById("amountInput");
+    input.placeholder = dir === 1
+      ? `Enter amount in ${selectedCurrency}`
+      : `Enter amount in ${selectedCoin}`;
+  }
+
+  async function doConvert() {
+    const amount = document.getElementById("amountInput").value;
+    const errorBox = document.getElementById("error");
+    const resultBox = document.getElementById("result");
+    const loading = document.getElementById("loading");
+    const convertBtn = document.getElementById("convertBtn");
+
+    errorBox.classList.remove("visible");
+    resultBox.classList.remove("visible");
+
+    if (!amount || Number(amount) < 0) {
+      errorBox.textContent = "Please enter a valid amount.";
+      errorBox.classList.add("visible");
+      return;
+    }
+
+    loading.classList.add("visible");
+    convertBtn.disabled = true;
+
+    const thisRequestId = ++requestCounter;
+
+    try {
+      const url = `${SERVER_URL}/convert?coin=${selectedCoin}&currency=${selectedCurrency}&amount=${amount}&direction=${direction}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (thisRequestId !== requestCounter) return;
+
+      if (!response.ok) {
+        throw new Error(data.error || "Something went wrong.");
+      }
+
+      const resultMain = document.getElementById("resultMain");
+      const resultUsd = document.getElementById("resultUsd");
+      const resultRate = document.getElementById("resultRate");
+
+      resultRate.textContent = `1 ${selectedCoin} = ${data.coinPriceInFiat.toLocaleString(undefined, {maximumFractionDigits: 2})} ${selectedCurrency} (${data.coinPriceUsd.toLocaleString(undefined, {maximumFractionDigits: 2})} USD)`;
+
+      if (direction === 1) {
+        resultMain.textContent = `${Number(amount).toLocaleString()} ${selectedCurrency} = ${data.result.toLocaleString(undefined, {maximumFractionDigits: 8})} ${selectedCoin}`;
+      } else {
+        resultMain.textContent = `${Number(amount).toLocaleString()} ${selectedCoin} = ${data.result.toLocaleString(undefined, {maximumFractionDigits: 2})} ${selectedCurrency}`;
+      }
+
+      resultUsd.textContent = `≈ ${data.resultInUsd.toLocaleString(undefined, {maximumFractionDigits: 2})} USD`;
+
+      const p2pUrl = `https://p2p.binance.com/en/trade/all-payments/${selectedCoin}?fiat=${selectedCurrency}`;
+      document.getElementById("buyBtn").href = p2pUrl;
+      document.getElementById("sellBtn").href = p2pUrl;
+
+      resultBox.classList.add("visible");
+
+    } catch (err) {
+      if (thisRequestId !== requestCounter) return;
+      errorBox.textContent = err.message.includes("Failed to fetch")
+        ? "Can't reach the server. Make sure rate_tracker is running in your terminal."
+        : err.message;
+      errorBox.classList.add("visible");
+    } finally {
+      if (thisRequestId === requestCounter) {
+        loading.classList.remove("visible");
+        convertBtn.disabled = false;
+      }
+    }
+  }
+
+  renderPills();
+  setDirection(1);
+</script>
+
+</body>
+</html>
