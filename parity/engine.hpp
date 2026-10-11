@@ -107,7 +107,7 @@ inline double fetchUsdToFiatRate(const std::string& fiatCode) {
 }
 
 // Maps ticker symbols to CoinGecko's ID format
-// CoinGecko uses full names (e.g. "bitcoin") 
+// CoinGecko uses full names (e.g. "bitcoin")
 inline std::string coinGeckoId(const std::string& coin) {
     static const std::map<std::string, std::string> ids = {
         {"BTC",  "bitcoin"},
@@ -152,29 +152,42 @@ inline double fetchCoinPriceUsdt(const std::string& coin) {
     return data[geckoId]["usd"].get<double>();
 }
 
+// The lock is held only while reading or writing the cache,
+// never during the network request, so the two fetches in convert()
+// can genuinely run at the same time.
 inline double getUsdToFiatRateCached(const std::string& fiatCode) {
-    std::lock_guard<std::mutex> lock(cacheMutex);
-
-    auto it = forexCache.find(fiatCode);
-    if (it != forexCache.end() && isFresh(it->second.fetchedAt)) {
-        return it->second.value;
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex);
+        auto it = forexCache.find(fiatCode);
+        if (it != forexCache.end() && isFresh(it->second.fetchedAt)) {
+            return it->second.value;
+        }
     }
 
     double rate = fetchUsdToFiatRate(fiatCode);
-    forexCache[fiatCode] = {rate, std::chrono::steady_clock::now()};
+
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex);
+        forexCache[fiatCode] = {rate, std::chrono::steady_clock::now()};
+    }
     return rate;
 }
 
 inline double getCoinPriceCached(const std::string& coin) {
-    std::lock_guard<std::mutex> lock(cacheMutex);
-
-    auto it = coinCache.find(coin);
-    if (it != coinCache.end() && isFresh(it->second.fetchedAt)) {
-        return it->second.value;
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex);
+        auto it = coinCache.find(coin);
+        if (it != coinCache.end() && isFresh(it->second.fetchedAt)) {
+            return it->second.value;
+        }
     }
 
     double price = fetchCoinPriceUsdt(coin);
-    coinCache[coin] = {price, std::chrono::steady_clock::now()};
+
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex);
+        coinCache[coin] = {price, std::chrono::steady_clock::now()};
+    }
     return price;
 }
 
